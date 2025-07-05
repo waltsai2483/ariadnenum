@@ -156,7 +156,7 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                     }
 
                     for attr in &variant.attrs {
-                        if !attr.path().is_ident("message") {
+                        if !attr.path().is_ident("note") {
                             continue;
                         }
 

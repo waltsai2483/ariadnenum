@@ -6,15 +6,16 @@ use ariadnenum::Ariadnenum;
 #[derive(Ariadnenum)]
 enum LexingError {
     #[report(
-        kind = ariadne::ReportKind::Error, // Optional, default = ReportKind::Error
-        config = ariadne::Config::new().with_index_type(ariadne::IndexType::Byte), // Optional, default = None
-        code = 300 // Optional, default = None
+        kind = ariadne::ReportKind::Error, // Default = ReportKind::Error
+        config = ariadne::Config::new().with_index_type(ariadne::IndexType::Byte), // Default = None
+        code = 300 // Default = None
     )]
-    #[message("Unexpected closing bracket: '{}'", kind)] // Error message 
-    #[note("remove this closing bracket")] // Note message below
+    #[message("Unexpected closing bracket")] // Error message 
+    #[note("remove this bracket")] // Note message below
     BracketMismatch {
-        #[colored(ariadne::Color::Yellow)] // Place #[colored] before #[label] to change the color of the label
-        #[label("Bracket {} is here", kind)] // Label message will be "Bracket {kind} is here" pointing at {location}
+        #[colored(ariadne::Color::Yellow)] // Place #[colored] before #[label] to change the
+                                           // color of the label, default = Color::Red
+        #[label("Bracket {} is here", kind)] // Label "Bracket {kind} is here" pointing at {location}
         #[here] // Determine error main location
         location: Range<usize>,
         kind: char,
@@ -23,8 +24,8 @@ enum LexingError {
     #[report(
         kind = ariadne::ReportKind::Warning,
     )]
-    #[message("Unused Semicolon")]
-    #[note("remove this closing bracket")]
+    #[message("Unused Semicolon: '{}'", arg1)] // Get unnamed argument using 'arg{k}' format
+    #[note("remove this semicolon")]
     UnusedSemicolon ( // Unnamed variants are supported
         #[colored(ariadne::Color::Yellow)]
         #[label("Here")] 
