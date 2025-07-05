@@ -1,5 +1,3 @@
-use std::iter::empty;
-
 use proc_macro::{TokenStream};
 use quote::{format_ident, quote};
 use syn::{parse::ParseStream, parse_macro_input, Attribute, Data, DeriveInput, Expr, Ident, LitStr};
@@ -96,7 +94,7 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                 }
                 syn::Fields::Unnamed(fields) => {
                     let mut args = Vec::new();
-                    for (i, field) in fields.unnamed.iter().enumerate() {
+                    for i in 0..fields.unnamed.len() {
                         let ident = format_ident!("arg{}", i);
                         args.push(quote! { #ident });
                     }
@@ -152,7 +150,7 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                 }
                 syn::Fields::Unnamed(fields) => {
                     let mut args = Vec::new();
-                    for (i, field) in fields.unnamed.iter().enumerate() {
+                    for i in 0..fields.unnamed.len() {
                         let ident = format_ident!("arg{}", i);
                         args.push(quote! { #ident });
                     }
