@@ -10,7 +10,7 @@ categories = ["command-line-utilities", "compilers", "visualization"]
 edition = "2024"
 license = "MIT"
 exclude = [
-    "test/*"
+    "tests/*"
 ]
 
 [dependencies]
