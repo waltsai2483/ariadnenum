@@ -9,6 +9,9 @@ keywords = ["enum", "ariadne", "error", "proc-macros", "diagnostics"]
 categories = ["command-line-utilities", "compilers", "visualization"]
 edition = "2024"
 license = "MIT"
+exclude = [
+    "test/*"
+]
 
 [dependencies]
 syn = "2"
