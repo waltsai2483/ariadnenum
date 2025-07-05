@@ -22,9 +22,9 @@ fn parse_label(input: ParseStream) -> syn::Result<(LitStr, Vec<Expr>)> {
 
 fn parse_report_config(input: ParseStream) -> syn::Result<(proc_macro2::TokenStream, proc_macro2::TokenStream, proc_macro2::TokenStream)> {
     let mut return_tuple = (
-        quote! {ariadne::ReportKind::Error},
-        quote! {ariadne::Config::new().with_index_type(ariadne::IndexType::Byte)},
-        quote! {3}
+        quote! { Some(ariadne::ReportKind::Error) },
+        quote! { None },
+        quote! { None }
     );
 
     loop {
@@ -37,13 +37,13 @@ fn parse_report_config(input: ParseStream) -> syn::Result<(proc_macro2::TokenStr
         let value: Expr = input.parse()?;
     
         if key == "kind" {
-            return_tuple.0 = quote! { #value };
+            return_tuple.0 = quote! { Some(#value) };
         }
         else if key == "config" {
-            return_tuple.1 = quote! { #value };
+            return_tuple.1 = quote! { Some(#value) };
         }
         else if key == "code" {
-            return_tuple.2 = quote! { #value };
+            return_tuple.2 = quote! { Some(#value) };
         }
 
         if input.parse::<syn::Token![,]>().is_err() {
@@ -202,7 +202,7 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                                     #enum_name #ty_generics :: #variant_ident ( .. ) => #kind
                                 },
                                 syn::Fields::Unit => quote! {
-                                    ariadne::ReportKind::Error
+                                    #enum_name #ty_generics :: #variant_ident => #kind
                                 }
                             },
                             match &variant.fields {
@@ -213,7 +213,7 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                                     #enum_name #ty_generics :: #variant_ident ( .. ) => #config
                                 },
                                 syn::Fields::Unit => quote! {
-                                    ariadne::Config::new().with_index_type(ariadne::IndexType::Byte)
+                                    #enum_name #ty_generics :: #variant_ident => #config
                                 }
                             },
                             match &variant.fields {
@@ -224,7 +224,7 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                                     #enum_name #ty_generics :: #variant_ident ( .. ) => #code
                                 },
                                 syn::Fields::Unit => quote! {
-                                    3
+                                    #enum_name #ty_generics :: #variant_ident => #code
                                 }
                             },
                         )
@@ -239,24 +239,24 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
         let codes = arms.map(|t| t.2);
 
         quote! {
-            pub fn kind(&self) -> ariadne::ReportKind {
+            pub fn kind(&self) -> Option<ariadne::ReportKind> {
                 match self {
                     #(#kinds,)*
-                    _ => ariadne::ReportKind::Error
+                    _ => Some(ariadne::ReportKind::Error)
                 }
             }
             
-            pub fn config(&self) -> ariadne::Config {
+            pub fn config(&self) -> Option<ariadne::Config> {
                 match self {
                     #(#configs,)*
-                    _ => ariadne::Config::new().with_index_type(ariadne::IndexType::Byte)
+                    _ => None
                 }
             }
             
-            pub fn code(&self) -> usize {
+            pub fn code(&self) -> Option<usize> {
                 match self {
                     #(#codes,)*
-                    _ => 3
+                    _ => None
                 }
             }
         }
@@ -411,21 +411,28 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                 #match_labels
             }
 
-            pub fn report(&self) -> Option<ariadne::Report> {
+            pub fn eprint_report(&self, filename: &str, source: ariadne::Source) -> Result<(), std::io::Error> {
                 if self.error_location().is_none() || self.message().is_none() {
-                    return None
+                    return Err((std::io::Error::new(std::io::ErrorKind::Other, "Missing location or message")));
                 }
 
                 let mut builder = ariadne::Report::build(
-                    self.kind(),
-                    self.error_location().unwrap()
+                    self.kind().unwrap(),
+                    (filename, self.error_location().unwrap())
                 )
-                .with_config(self.config())
                 .with_message(self.message().unwrap());
+                
+                if let Some(code) = self.code() {
+                    builder = builder.with_code(code);
+                }
+
+                if let Some(config) = self.config() {
+                    builder = builder.with_config(config);
+                }
 
                 for (color, label, span) in self.labels() {
                     builder = builder.with_label(
-                        ariadne::Label::new(span)
+                        ariadne::Label::new((filename, span))
                         .with_message(label)
                         .with_color(color)
                     );
@@ -435,7 +442,7 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                     builder = builder.with_note(self.note().unwrap());
                 }
 
-                Some(builder.finish())
+                builder.finish().eprint((filename, source))
             }
         }
     }
