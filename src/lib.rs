@@ -1,8 +1,8 @@
 use std::iter::empty;
 
-use proc_macro::TokenStream;
+use proc_macro::{TokenStream};
 use quote::{format_ident, quote};
-use syn::{Attribute, Data, DeriveInput, Expr, Lit, LitStr, parse::ParseStream, parse_macro_input};
+use syn::{parse::ParseStream, parse_macro_input, Attribute, Data, DeriveInput, Expr, Ident, LitStr};
 
 fn has_attr(attrs: &[Attribute], target_str: &str) -> bool {
     attrs.iter().any(|attr| attr.path().is_ident(target_str))
@@ -20,7 +20,41 @@ fn parse_label(input: ParseStream) -> syn::Result<(LitStr, Vec<Expr>)> {
     Ok((fmt, args))
 }
 
-#[proc_macro_derive(Ariadnenum, attributes(message, here, label, config, report))]
+fn parse_report_config(input: ParseStream) -> syn::Result<(proc_macro2::TokenStream, proc_macro2::TokenStream, proc_macro2::TokenStream)> {
+    let mut return_tuple = (
+        quote! {ariadne::ReportKind::Error},
+        quote! {ariadne::Config::new().with_index_type(ariadne::IndexType::Byte)},
+        quote! {3}
+    );
+
+    loop {
+        let key = input.parse();
+        if key.is_err() {
+            break;
+        }
+        let key: Ident = key.unwrap();
+        input.parse::<syn::Token![=]>()?;
+        let value: Expr = input.parse()?;
+    
+        if key == "kind" {
+            return_tuple.0 = quote! { #value };
+        }
+        else if key == "config" {
+            return_tuple.1 = quote! { #value };
+        }
+        else if key == "code" {
+            return_tuple.2 = quote! { #value };
+        }
+
+        if input.parse::<syn::Token![,]>().is_err() {
+            break
+        }
+    }
+
+    Ok(return_tuple)
+}
+
+#[proc_macro_derive(Ariadnenum, attributes(message, note, here, label, report, colored))]
 pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let enum_name = input.ident.clone();
@@ -92,39 +126,63 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
         }
     };
 
-    let match_config = {
+    let match_note = {
         let arms = enum_data.variants.iter().filter_map(|variant| {
             let variant_ident = variant.ident.clone();
-            for attr in &variant.attrs {
-                if !attr.path().is_ident("config") {
-                    continue;
-                }
-                
-                let expr: Result<Expr, syn::Error> = attr.parse_args();
-                if let Ok(expr) = expr {
-                    return match &variant.fields {
-                        syn::Fields::Named(_) => Some(quote! {
-                            #enum_name #ty_generics :: #variant_ident { .. } => #expr
-                        }),
-                        syn::Fields::Unnamed(_) => Some(quote! {
-                            #enum_name #ty_generics :: #variant_ident ( .. ) => #expr
-                        }),
-                        syn::Fields::Unit => None
+            match &variant.fields {
+                syn::Fields::Named(fields) => {
+                    let mut args = Vec::new();
+                    for field in &fields.named {
+                        let ident = field.ident.clone().unwrap();
+                        args.push(quote! { #ident });
                     }
+
+                    for attr in &variant.attrs {
+                        if !attr.path().is_ident("note") {
+                            continue;
+                        }
+
+                        if let Ok((label, exprs)) = attr.parse_args_with(parse_label) {
+                            return Some(quote! {
+                                #enum_name #ty_generics :: #variant_ident { #(#args,)* } => Some(format!(#label, #(#exprs,)*))
+                            });
+                        }
+                    }
+                    None
                 }
+                syn::Fields::Unnamed(fields) => {
+                    let mut args = Vec::new();
+                    for (i, field) in fields.unnamed.iter().enumerate() {
+                        let ident = format_ident!("arg{}", i);
+                        args.push(quote! { #ident });
+                    }
+
+                    for attr in &variant.attrs {
+                        if !attr.path().is_ident("message") {
+                            continue;
+                        }
+
+                        if let Ok((label, exprs)) = attr.parse_args_with(parse_label) {
+                            return Some(quote! {
+                                #enum_name #ty_generics :: #variant_ident (#(#args,)*) => Some(format!(#label, #(#exprs,)*))
+                            });
+                        }
+                    }
+                    None
+                }
+                syn::Fields::Unit => None,
             }
-            None
         });
 
         quote! {
             match self {
                 #(#arms,)*
-                _ => ariadne::Config::new().with_index_type(ariadne::IndexType::Byte)
+                _ => None
             }
         }
     };
 
-    let match_report_kind = {
+    let match_report = {
         let arms = enum_data.variants.iter().filter_map(|variant| {
             let variant_ident = variant.ident.clone();
             for attr in &variant.attrs {
@@ -132,26 +190,74 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                     continue;
                 }
                 
-                let expr: Result<Expr, syn::Error> = attr.parse_args();
-                if let Ok(expr) = expr {
-                    return match &variant.fields {
-                        syn::Fields::Named(_) => Some(quote! {
-                            #enum_name #ty_generics :: #variant_ident { .. } => #expr
-                        }),
-                        syn::Fields::Unnamed(_) => Some(quote! {
-                            #enum_name #ty_generics :: #variant_ident ( .. ) => #expr
-                        }),
-                        syn::Fields::Unit => None
-                    }
+                let expr = attr.parse_args_with(parse_report_config);
+                if let Ok((kind, config, code)) = expr {
+                    return Some(
+                        (
+                            match &variant.fields {
+                                syn::Fields::Named(_) => quote! {
+                                    #enum_name #ty_generics :: #variant_ident { .. } => #kind
+                                },
+                                syn::Fields::Unnamed(_) => quote! {
+                                    #enum_name #ty_generics :: #variant_ident ( .. ) => #kind
+                                },
+                                syn::Fields::Unit => quote! {
+                                    ariadne::ReportKind::Error
+                                }
+                            },
+                            match &variant.fields {
+                                syn::Fields::Named(_) => quote! {
+                                    #enum_name #ty_generics :: #variant_ident { .. } => #config
+                                },
+                                syn::Fields::Unnamed(_) => quote! {
+                                    #enum_name #ty_generics :: #variant_ident ( .. ) => #config
+                                },
+                                syn::Fields::Unit => quote! {
+                                    ariadne::Config::new().with_index_type(ariadne::IndexType::Byte)
+                                }
+                            },
+                            match &variant.fields {
+                                syn::Fields::Named(_) => quote! {
+                                    #enum_name #ty_generics :: #variant_ident { .. } => #code
+                                },
+                                syn::Fields::Unnamed(_) => quote! {
+                                    #enum_name #ty_generics :: #variant_ident ( .. ) => #code
+                                },
+                                syn::Fields::Unit => quote! {
+                                    3
+                                }
+                            },
+                        )
+                    );
                 }
             }
             None
         });
 
+        let kinds = arms.clone().map(|t| t.0);
+        let configs = arms.clone().map(|t| t.1);
+        let codes = arms.map(|t| t.2);
+
         quote! {
-            match self {
-                #(#arms,)*
-                _ => ariadne::ReportKind::Error
+            pub fn kind(&self) -> ariadne::ReportKind {
+                match self {
+                    #(#kinds,)*
+                    _ => ariadne::ReportKind::Error
+                }
+            }
+            
+            pub fn config(&self) -> ariadne::Config {
+                match self {
+                    #(#configs,)*
+                    _ => ariadne::Config::new().with_index_type(ariadne::IndexType::Byte)
+                }
+            }
+            
+            pub fn code(&self) -> usize {
+                match self {
+                    #(#codes,)*
+                    _ => 3
+                }
             }
         }
     };
@@ -212,14 +318,23 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                     for field in &fields.named {
                         let ident = field.ident.clone().unwrap();
                         args.push(quote! { #ident });
+                        let mut color = quote! { ariadne::Color::Red };
                         for attr in &field.attrs {
+                            if attr.path().is_ident("colored") {
+                                let expr: Result<Expr, syn::Error> = attr.parse_args();
+                                if let Ok(expr) = expr {
+                                    color = quote! { #expr };
+                                }
+                                continue;
+                            }
+
                             if !attr.path().is_ident("label") {
                                 continue;
                             }
 
                             if let Ok((label, args)) = attr.parse_args_with(parse_label) {
                                 labels.push(quote! {
-                                    (format!(#label, #(#args,)*), #ident.clone()),
+                                    (#color, format!(#label, #(#args,)*), #ident.clone()),
                                 });
                             }
                         }
@@ -236,14 +351,23 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                     for (i, field) in fields.unnamed.iter().enumerate() {
                         let ident = format_ident!("arg{}", i);
                         args.push(quote! { #ident });
+                        let mut color = quote! { ariadne::Color::Red };
                         for attr in &field.attrs {
+                            if attr.path().is_ident("colored") {
+                                let expr: Result<Expr, syn::Error> = attr.parse_args();
+                                if let Ok(expr) = expr {
+                                    color = quote! { #expr };
+                                }
+                                continue;
+                            }
+
                             if !attr.path().is_ident("label") {
                                 continue;
                             }
 
                             if let Ok((label, args)) = attr.parse_args_with(parse_label) {
                                 labels.push(quote! {
-                                    (format!(#label, #(#args,)*), #ident.clone()),
+                                    (#color, format!(#label, #(#args,)*), #ident.clone()),
                                 });
                             }
                         }
@@ -268,23 +392,22 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
 
     quote! {
         impl #impl_generics #enum_name #ty_generics #where_clause {
-            pub fn report_kind(&self) -> ariadne::ReportKind {
-                #match_report_kind
-            }
+            #match_report
 
             pub fn error_location(&self) -> Option<Range<usize>> {
                 #match_error_location
             }
 
-            pub fn config(&self) -> ariadne::Config {
-                #match_config
-            }
-
             pub fn message(&self) -> Option<String> {
                 #match_error_message
             }
+            
+            pub fn note(&self) -> Option<String> {
+                #match_note
+            }
 
-            pub fn labels(&self) -> Vec<(String, Range<usize>)> {
+
+            pub fn labels(&self) -> Vec<(ariadne::Color, String, Range<usize>)> {
                 #match_labels
             }
 
@@ -294,17 +417,22 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                 }
 
                 let mut builder = ariadne::Report::build(
-                    self.report_kind(),
+                    self.kind(),
                     self.error_location().unwrap()
                 )
                 .with_config(self.config())
                 .with_message(self.message().unwrap());
 
-                for (label, span) in self.labels() {
+                for (color, label, span) in self.labels() {
                     builder = builder.with_label(
                         ariadne::Label::new(span)
                         .with_message(label)
+                        .with_color(color)
                     );
+                }
+
+                if let Some(note) = self.note() {
+                    builder = builder.with_note(self.note().unwrap());
                 }
 
                 Some(builder.finish())

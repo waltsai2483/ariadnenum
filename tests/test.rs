@@ -4,26 +4,29 @@ use std::{
     ops::{Range, RangeInclusive},
 };
 
-use ariadne::{Config, ReportKind, Source};
+use ariadne::{Color, Config, Report, ReportKind, Source};
 use ariadnenum::Ariadnenum;
 
 #[derive(Ariadnenum)]
 enum MyError {
     Test,
     #[message("Test named: {}", it)]
-    #[report(ReportKind::Error)]
-    #[config(Config::new().with_index_type(ariadne::IndexType::Byte))]
+    #[report(kind = ReportKind::Warning, kind = ReportKind::Error)]
+    #[note("Test!!!")]
     TestNamed {
         it: i32,
         #[here]
+        #[colored(Color::Green)]
         #[label("span {}", it)]
         span: Range<usize>,
+        #[colored(Color::Yellow)]
         #[label("more span {}", it)]
         more_span: Range<usize>,
     },
     TestUnnamed(
         i32,
         #[here]
+        #[colored(Color::Yellow)]
         #[label("span {}", arg0)]
         Range<usize>,
         i32,
