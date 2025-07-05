@@ -1,4 +1,4 @@
-use std::{io::{Error, ErrorKind}, ops::Range};
+use std::{io::{Error, ErrorKind}};
 
 use ariadne::{Color, Config, Report, ReportKind, Source};
 use ariadnenum::Ariadnenum;
@@ -17,7 +17,7 @@ enum LexingError {
                                            // color of the label, default = Color::Red
         #[label("Bracket {} is here", kind)] // Label "Bracket {kind} is here" pointing at {location}
         #[here] // Determine error main location
-        location: Range<usize>,
+        location: std::ops::Range<usize>,
         kind: char,
     },
     
@@ -30,7 +30,7 @@ enum LexingError {
         #[colored(ariadne::Color::Yellow)]
         #[label("Here")] 
         #[here]
-        Range<usize>,
+        std::ops::Range<usize>,
         char,
     ),
 }

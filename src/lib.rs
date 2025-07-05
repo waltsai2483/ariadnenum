@@ -392,7 +392,7 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
         impl #impl_generics #enum_name #ty_generics #where_clause {
             #match_report
 
-            pub fn error_location(&self) -> Option<Range<usize>> {
+            pub fn error_location(&self) -> Option<std::ops::Range<usize>> {
                 #match_error_location
             }
 
@@ -405,7 +405,7 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
             }
 
 
-            pub fn labels(&self) -> Vec<(ariadne::Color, String, Range<usize>)> {
+            pub fn labels(&self) -> Vec<(ariadne::Color, String, std::ops::Range<usize>)> {
                 #match_labels
             }
 
