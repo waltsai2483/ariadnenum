@@ -1,0 +1,12 @@
+[package]
+name = "ariadnenum"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+syn = "2"
+quote = "1"
+ariadne = "0.5.1"
+
+[lib]
+proc-macro = true
