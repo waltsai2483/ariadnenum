@@ -1,6 +1,6 @@
 [package]
 name = "ariadnenum"
-version = "0.1.1"
+version = "0.1.2"
 description = "Derive macros to easily generate ariadne report from error variants"
 repository = "https://github.com/waltsai2483/ariadnenum"
 authors = ["waltsai2483 <waltsai930830@gmail.com>"]

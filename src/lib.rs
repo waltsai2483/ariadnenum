@@ -86,7 +86,7 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
 
                         if let Ok((label, exprs)) = attr.parse_args_with(parse_label) {
                             return Some(quote! {
-                                #enum_name #ty_generics :: #variant_ident { #(#args,)* } => Some(format!(#label, #(#exprs,)*))
+                                #enum_name :: #variant_ident { #(#args,)* } => Some(format!(#label, #(#exprs,)*))
                             });
                         }
                     }
@@ -106,7 +106,7 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
 
                         if let Ok((label, exprs)) = attr.parse_args_with(parse_label) {
                             return Some(quote! {
-                                #enum_name #ty_generics :: #variant_ident (#(#args,)*) => Some(format!(#label, #(#exprs,)*))
+                                #enum_name :: #variant_ident (#(#args,)*) => Some(format!(#label, #(#exprs,)*))
                             });
                         }
                     }
@@ -142,7 +142,7 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
 
                         if let Ok((label, exprs)) = attr.parse_args_with(parse_label) {
                             return Some(quote! {
-                                #enum_name #ty_generics :: #variant_ident { #(#args,)* } => Some(format!(#label, #(#exprs,)*))
+                                #enum_name :: #variant_ident { #(#args,)* } => Some(format!(#label, #(#exprs,)*))
                             });
                         }
                     }
@@ -162,7 +162,7 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
 
                         if let Ok((label, exprs)) = attr.parse_args_with(parse_label) {
                             return Some(quote! {
-                                #enum_name #ty_generics :: #variant_ident (#(#args,)*) => Some(format!(#label, #(#exprs,)*))
+                                #enum_name :: #variant_ident (#(#args,)*) => Some(format!(#label, #(#exprs,)*))
                             });
                         }
                     }
@@ -194,35 +194,35 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                         (
                             match &variant.fields {
                                 syn::Fields::Named(_) => quote! {
-                                    #enum_name #ty_generics :: #variant_ident { .. } => #kind
+                                    #enum_name :: #variant_ident { .. } => #kind
                                 },
                                 syn::Fields::Unnamed(_) => quote! {
-                                    #enum_name #ty_generics :: #variant_ident ( .. ) => #kind
+                                    #enum_name :: #variant_ident ( .. ) => #kind
                                 },
                                 syn::Fields::Unit => quote! {
-                                    #enum_name #ty_generics :: #variant_ident => #kind
+                                    #enum_name :: #variant_ident => #kind
                                 }
                             },
                             match &variant.fields {
                                 syn::Fields::Named(_) => quote! {
-                                    #enum_name #ty_generics :: #variant_ident { .. } => #config
+                                    #enum_name :: #variant_ident { .. } => #config
                                 },
                                 syn::Fields::Unnamed(_) => quote! {
-                                    #enum_name #ty_generics :: #variant_ident ( .. ) => #config
+                                    #enum_name :: #variant_ident ( .. ) => #config
                                 },
                                 syn::Fields::Unit => quote! {
-                                    #enum_name #ty_generics :: #variant_ident => #config
+                                    #enum_name :: #variant_ident => #config
                                 }
                             },
                             match &variant.fields {
                                 syn::Fields::Named(_) => quote! {
-                                    #enum_name #ty_generics :: #variant_ident { .. } => #code
+                                    #enum_name :: #variant_ident { .. } => #code
                                 },
                                 syn::Fields::Unnamed(_) => quote! {
-                                    #enum_name #ty_generics :: #variant_ident ( .. ) => #code
+                                    #enum_name :: #variant_ident ( .. ) => #code
                                 },
                                 syn::Fields::Unit => quote! {
-                                    #enum_name #ty_generics :: #variant_ident => #code
+                                    #enum_name :: #variant_ident => #code
                                 }
                             },
                         )
@@ -269,7 +269,7 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                         if has_attr(&field.attrs, "here") {
                             let arg = field.ident.clone().unwrap();
                             return Some(quote! {
-                                #enum_name #ty_generics :: #variant_ident { #arg, .. } => Some(#arg.clone()),
+                                #enum_name :: #variant_ident { #arg, .. } => Some(#arg.clone()),
                             });
                         }
                     }
@@ -288,7 +288,7 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                     };
                     if found {
                         Some(quote! {
-                            #enum_name #ty_generics :: #variant_ident ( #(#patterns)* ) => Some(span.clone()),
+                            #enum_name :: #variant_ident ( #(#patterns)* ) => Some(span.clone()),
                         })
                     } else {
                         None
@@ -324,22 +324,18 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                                     color = quote! { #expr };
                                 }
                                 continue;
-                            }
-
-                            if !attr.path().is_ident("label") {
-                                continue;
-                            }
-
-                            if let Ok((label, args)) = attr.parse_args_with(parse_label) {
-                                labels.push(quote! {
-                                    (#color, format!(#label, #(#args,)*), #ident.clone()),
-                                });
+                            } else if attr.path().is_ident("label") {
+                                if let Ok((label, args)) = attr.parse_args_with(parse_label) {
+                                    labels.push(quote! {
+                                        (#color, format!(#label, #(#args,)*), #ident.clone()),
+                                    });
+                                }
                             }
                         }
                     }
                     Some(
                         quote! {
-                            #enum_name #ty_generics :: #variant_ident { #(#args,)* } => vec![#(#labels)*]
+                            #enum_name :: #variant_ident { #(#args,)* } => vec![#(#labels)*]
                         }
                     )
                 }
@@ -357,22 +353,18 @@ pub fn derive_ariadnenum(input: TokenStream) -> TokenStream {
                                     color = quote! { #expr };
                                 }
                                 continue;
-                            }
-
-                            if !attr.path().is_ident("label") {
-                                continue;
-                            }
-
-                            if let Ok((label, args)) = attr.parse_args_with(parse_label) {
-                                labels.push(quote! {
-                                    (#color, format!(#label, #(#args,)*), #ident.clone()),
-                                });
+                            } else if attr.path().is_ident("label") {
+                                if let Ok((label, args)) = attr.parse_args_with(parse_label) {
+                                    labels.push(quote! {
+                                        (#color, format!(#label, #(#args,)*), #ident.clone()),
+                                    });
+                                }
                             }
                         }
                     }
                     Some(
                         quote! {
-                            #enum_name #ty_generics :: #variant_ident ( #(#args,)* ) => vec![#(#labels)*]
+                            #enum_name :: #variant_ident ( #(#args,)* ) => vec![#(#labels)*]
                         }
                     )
                 }
