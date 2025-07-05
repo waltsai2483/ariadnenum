@@ -1,7 +1,14 @@
 [package]
 name = "ariadnenum"
 version = "0.1.0"
+description = "Derive macros to easily generate ariadne report from error variants"
+repository = "https://github.com/waltsai2483/ariadnenum"
+authors = ["waltsai2483 <waltsai930830@gmail.com>"]
+readme = "README.md"
+keywords = ["enum", "ariadne", "error", "proc-macros", "diagnostics"]
+categories = ["command-line-utilities", "compilers", "visualization"]
 edition = "2024"
+license = "MIT"
 
 [dependencies]
 syn = "2"
